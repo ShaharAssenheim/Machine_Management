@@ -9,6 +9,7 @@ namespace Server.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
+    [Produces("application/json")]
     public class MachinesController : ControllerBase
     {
         private readonly IMachineService _machineService;
@@ -21,212 +22,197 @@ namespace Server.Controllers
         }
 
         /// <summary>
-        /// Get all machines
+        /// Retrieves all machines
         /// </summary>
+        /// <returns>List of all machines</returns>
         [HttpGet]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(IEnumerable<MachineDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<IEnumerable<MachineDto>>> GetAllMachines()
         {
-            try
-            {
-                var machines = await _machineService.GetAllMachinesAsync();
-                return Ok(machines);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving all machines");
-                return StatusCode(500, "An error occurred while retrieving machines.");
-            }
+            var machines = await _machineService.GetAllMachinesAsync();
+            return Ok(machines);
         }
 
         /// <summary>
-        /// Get a machine by ID
+        /// Retrieves a machine by its ID
         /// </summary>
-        [HttpGet("{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        /// <param name="id">The machine ID</param>
+        /// <returns>The requested machine</returns>
+        [HttpGet("{id:int}")]
+        [ProducesResponseType(typeof(MachineDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MachineDto>> GetMachineById(int id)
         {
-            try
+            var machine = await _machineService.GetMachineByIdAsync(id);
+            
+            if (machine == null)
             {
-                var machine = await _machineService.GetMachineByIdAsync(id);
-                if (machine == null)
-                {
-                    return NotFound($"Machine with ID {id} not found.");
-                }
-                return Ok(machine);
+                _logger.LogWarning("Machine with ID {MachineId} not found", id);
+                return NotFound(new { message = $"Machine with ID {id} not found" });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving machine with ID {MachineId}", id);
-                return StatusCode(500, "An error occurred while retrieving the machine.");
-            }
+            
+            return Ok(machine);
         }
 
         /// <summary>
-        /// Get a machine by name
+        /// Retrieves a machine by its name
         /// </summary>
+        /// <param name="name">The machine name</param>
+        /// <returns>The requested machine</returns>
         [HttpGet("by-name/{name}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(MachineDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MachineDto>> GetMachineByName(string name)
         {
-            try
+            var machine = await _machineService.GetMachineByNameAsync(name);
+            
+            if (machine == null)
             {
-                var machine = await _machineService.GetMachineByNameAsync(name);
-                if (machine == null)
-                {
-                    return NotFound($"Machine with name '{name}' not found.");
-                }
-                return Ok(machine);
+                _logger.LogWarning("Machine with name '{MachineName}' not found", name);
+                return NotFound(new { message = $"Machine with name '{name}' not found" });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving machine with name {MachineName}", name);
-                return StatusCode(500, "An error occurred while retrieving the machine.");
-            }
+            
+            return Ok(machine);
         }
 
         /// <summary>
-        /// Get machines by status
+        /// Retrieves machines by status
         /// </summary>
+        /// <param name="status">The machine status</param>
+        /// <returns>List of machines with the specified status</returns>
         [HttpGet("by-status/{status}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(IEnumerable<MachineDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<IEnumerable<MachineDto>>> GetMachinesByStatus(MachineStatus status)
         {
-            try
-            {
-                var machines = await _machineService.GetMachinesByStatusAsync(status);
-                return Ok(machines);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving machines with status {Status}", status);
-                return StatusCode(500, "An error occurred while retrieving machines.");
-            }
+            var machines = await _machineService.GetMachinesByStatusAsync(status);
+            return Ok(machines);
         }
 
         /// <summary>
-        /// Get machines by location
+        /// Retrieves machines by location
         /// </summary>
+        /// <param name="country">The country name</param>
+        /// <param name="city">The city name (optional)</param>
+        /// <returns>List of machines in the specified location</returns>
         [HttpGet("by-location")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(IEnumerable<MachineDto>), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<IEnumerable<MachineDto>>> GetMachinesByLocation(
             [FromQuery] string country, 
             [FromQuery] string? city = null)
         {
-            try
-            {
-                var machines = await _machineService.GetMachinesByLocationAsync(country, city);
-                return Ok(machines);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving machines for location {Country}/{City}", country, city);
-                return StatusCode(500, "An error occurred while retrieving machines.");
-            }
+            var machines = await _machineService.GetMachinesByLocationAsync(country, city);
+            return Ok(machines);
         }
 
         /// <summary>
-        /// Create a new machine
+        /// Creates a new machine
         /// </summary>
+        /// <param name="createDto">Machine creation data</param>
+        /// <returns>The created machine</returns>
         [HttpPost]
-        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(MachineDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MachineDto>> CreateMachine([FromBody] CreateMachineDto createDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState);
-                }
-
                 var machine = await _machineService.CreateMachineAsync(createDto);
                 return CreatedAtAction(nameof(GetMachineById), new { id = machine.Id }, machine);
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Validation error creating machine");
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating machine");
-                return StatusCode(500, "An error occurred while creating the machine.");
+                return BadRequest(new { message = ex.Message });
             }
         }
 
         /// <summary>
-        /// Update an existing machine
+        /// Updates an existing machine
         /// </summary>
-        [HttpPut("{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        /// <param name="id">The machine ID</param>
+        /// <param name="updateDto">Machine update data</param>
+        /// <returns>The updated machine</returns>
+        [HttpPut("{id:int}")]
+        [ProducesResponseType(typeof(MachineDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MachineDto>> UpdateMachine(int id, [FromBody] UpdateMachineDto updateDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
-                if (!ModelState.IsValid)
-                {
-                    return BadRequest(ModelState);
-                }
-
                 var machine = await _machineService.UpdateMachineAsync(id, updateDto);
+                
                 if (machine == null)
                 {
-                    return NotFound($"Machine with ID {id} not found.");
+                    _logger.LogWarning("Machine with ID {MachineId} not found for update", id);
+                    return NotFound(new { message = $"Machine with ID {id} not found" });
                 }
+                
                 return Ok(machine);
             }
             catch (InvalidOperationException ex)
             {
                 _logger.LogWarning(ex, "Validation error updating machine {MachineId}", id);
-                return BadRequest(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating machine {MachineId}", id);
-                return StatusCode(500, "An error occurred while updating the machine.");
+                return BadRequest(new { message = ex.Message });
             }
         }
 
         /// <summary>
-        /// Partially update a machine (PATCH)
+        /// Partially updates a machine
         /// </summary>
-        [HttpPatch("{id}")]
-        [ProducesResponseType(StatusCodes.Status200OK)]
+        /// <param name="id">The machine ID</param>
+        /// <param name="updateDto">Machine partial update data</param>
+        /// <returns>The updated machine</returns>
+        [HttpPatch("{id:int}")]
+        [ProducesResponseType(typeof(MachineDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<MachineDto>> PatchMachine(int id, [FromBody] UpdateMachineDto updateDto)
         {
-            // Same implementation as PUT since UpdateMachineDto has nullable properties
+            // PATCH and PUT use the same update logic since UpdateMachineDto already supports partial updates
             return await UpdateMachine(id, updateDto);
         }
 
         /// <summary>
-        /// Delete a machine
+        /// Deletes a machine
         /// </summary>
-        [HttpDelete("{id}")]
+        /// <param name="id">The machine ID</param>
+        /// <returns>No content on success</returns>
+        [HttpDelete("{id:int}")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> DeleteMachine(int id)
         {
-            try
+            var deleted = await _machineService.DeleteMachineAsync(id);
+            
+            if (!deleted)
             {
-                var deleted = await _machineService.DeleteMachineAsync(id);
-                if (!deleted)
-                {
-                    return NotFound($"Machine with ID {id} not found.");
-                }
-                return NoContent();
+                _logger.LogWarning("Machine with ID {MachineId} not found for deletion", id);
+                return NotFound(new { message = $"Machine with ID {id} not found" });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting machine {MachineId}", id);
-                return StatusCode(500, "An error occurred while deleting the machine.");
-            }
+            
+            _logger.LogInformation("Machine with ID {MachineId} deleted successfully", id);
+            return NoContent();
         }
     }
 }

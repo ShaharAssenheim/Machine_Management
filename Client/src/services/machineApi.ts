@@ -1,7 +1,9 @@
 import { Machine, MachineStatus, ModelType, TubeType } from '../types';
+import { API_CONFIG, AUTH_CONFIG, UI_CONSTANTS } from '../constants';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
-const MACHINE_IMAGE_URL = '/ONYX-3000.png';
+const { BASE_URL } = API_CONFIG;
+const { TOKEN_KEY } = AUTH_CONFIG;
+const MACHINE_IMAGE_URL = UI_CONSTANTS.DEFAULT_MACHINE_IMAGE;
 
 // API Response type (matches server DTOs with camelCase)
 interface ApiMachine {
@@ -91,7 +93,7 @@ const mapApiMachineToMachine = (apiMachine: ApiMachine): Machine => {
 
 // Helper to get auth headers
 const getAuthHeaders = (): HeadersInit => {
-  const token = localStorage.getItem('auth_token');
+  const token = localStorage.getItem(TOKEN_KEY);
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -109,133 +111,101 @@ export const machineApi = {
    * Get all machines
    */
   async getAll(): Promise<Machine[]> {
-    try {
-      console.log('Fetching machines from:', `${API_BASE_URL}/machines`);
-      console.log('Auth headers:', getAuthHeaders());
-      
-      const response = await fetch(`${API_BASE_URL}/machines`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+    const response = await fetch(`${BASE_URL}/machines`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-      console.log('Response status:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Response error:', errorText);
-        throw new Error(`Failed to fetch machines: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      const apiMachines: ApiMachine[] = await response.json();
-      return apiMachines.map(mapApiMachineToMachine);
-    } catch (error) {
-      console.error('Error fetching machines:', error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch machines: ${response.statusText}`);
     }
+
+    const apiMachines: ApiMachine[] = await response.json();
+    return apiMachines.map(mapApiMachineToMachine);
   },
 
   /**
    * Get a machine by ID
    */
   async getById(id: number): Promise<Machine | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/machines/${id}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+    const response = await fetch(`${BASE_URL}/machines/${id}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch machine: ${response.statusText}`);
-      }
-
-      const apiMachine: ApiMachine = await response.json();
-      return mapApiMachineToMachine(apiMachine);
-    } catch (error) {
-      console.error(`Error fetching machine ${id}:`, error);
-      throw error;
+    if (response.status === 404) {
+      return null;
     }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch machine: ${response.statusText}`);
+    }
+
+    const apiMachine: ApiMachine = await response.json();
+    return mapApiMachineToMachine(apiMachine);
   },
 
   /**
    * Get a machine by name
    */
   async getByName(name: string): Promise<Machine | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/machines/by-name/${encodeURIComponent(name)}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+    const response = await fetch(`${BASE_URL}/machines/by-name/${encodeURIComponent(name)}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-      if (response.status === 404) {
-        return null;
-      }
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch machine: ${response.statusText}`);
-      }
-
-      const apiMachine: ApiMachine = await response.json();
-      return mapApiMachineToMachine(apiMachine);
-    } catch (error) {
-      console.error(`Error fetching machine ${name}:`, error);
-      throw error;
+    if (response.status === 404) {
+      return null;
     }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch machine: ${response.statusText}`);
+    }
+
+    const apiMachine: ApiMachine = await response.json();
+    return mapApiMachineToMachine(apiMachine);
   },
 
   /**
    * Get machines by status
    */
   async getByStatus(status: MachineStatus): Promise<Machine[]> {
-    try {
-      // Convert client enum to server enum string
-      const serverStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
-      
-      const response = await fetch(`${API_BASE_URL}/machines/by-status/${serverStatus}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
+    // Convert client enum to server enum string
+    const serverStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+    
+    const response = await fetch(`${BASE_URL}/machines/by-status/${serverStatus}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch machines by status: ${response.statusText}`);
-      }
-
-      const apiMachines: ApiMachine[] = await response.json();
-      return apiMachines.map(mapApiMachineToMachine);
-    } catch (error) {
-      console.error(`Error fetching machines by status ${status}:`, error);
-      throw error;
+    if (!response.ok) {
+      throw new Error(`Failed to fetch machines by status: ${response.statusText}`);
     }
+
+    const apiMachines: ApiMachine[] = await response.json();
+    return apiMachines.map(mapApiMachineToMachine);
   },
 
   /**
    * Get machines by location
    */
   async getByLocation(country: string, city?: string): Promise<Machine[]> {
-    try {
-      const params = new URLSearchParams({ country });
-      if (city) {
-        params.append('city', city);
-      }
-
-      const response = await fetch(`${API_BASE_URL}/machines/by-location?${params}`, {
-        method: 'GET',
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch machines by location: ${response.statusText}`);
-      }
-
-      const apiMachines: ApiMachine[] = await response.json();
-      return apiMachines.map(mapApiMachineToMachine);
-    } catch (error) {
-      console.error(`Error fetching machines by location:`, error);
-      throw error;
+    const params = new URLSearchParams({ country });
+    if (city) {
+      params.append('city', city);
     }
+
+    const response = await fetch(`${BASE_URL}/machines/by-location?${params}`, {
+      method: 'GET',
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch machines by location: ${response.statusText}`);
+    }
+
+    const apiMachines: ApiMachine[] = await response.json();
+    return apiMachines.map(mapApiMachineToMachine);
   },
 };
 

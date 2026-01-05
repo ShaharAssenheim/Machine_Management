@@ -6,6 +6,7 @@ namespace Server.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Produces("application/json")]
     public class AuthController : ControllerBase
     {
         private readonly IAuthService _authService;
@@ -17,9 +18,22 @@ namespace Server.Controllers
             _logger = logger;
         }
 
+        /// <summary>
+        /// Register a new user
+        /// </summary>
+        /// <param name="registerDto">Registration data</param>
+        /// <returns>Authentication response with JWT token</returns>
         [HttpPost("register")]
+        [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<AuthResponseDto>> Register([FromBody] RegisterDto registerDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 var response = await _authService.RegisterAsync(registerDto);
@@ -31,16 +45,24 @@ namespace Server.Controllers
                 _logger.LogWarning("Registration failed: {Message}", ex.Message);
                 return BadRequest(new { message = ex.Message });
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during registration");
-                return StatusCode(500, new { message = "An error occurred during registration" });
-            }
         }
 
+        /// <summary>
+        /// Authenticate a user
+        /// </summary>
+        /// <param name="loginDto">Login credentials</param>
+        /// <returns>Authentication response with JWT token</returns>
         [HttpPost("login")]
+        [ProducesResponseType(typeof(AuthResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto loginDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 var response = await _authService.LoginAsync(loginDto);
@@ -49,19 +71,26 @@ namespace Server.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                _logger.LogWarning("Login failed: {Message}", ex.Message);
+                _logger.LogWarning("Login failed for {Email}: {Message}", loginDto.Email, ex.Message);
                 return Unauthorized(new { message = ex.Message });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during login");
-                return StatusCode(500, new { message = "An error occurred during login" });
             }
         }
 
+        /// <summary>
+        /// Request a password reset
+        /// </summary>
+        /// <param name="forgotPasswordDto">Email for password reset</param>
+        /// <returns>Confirmation message</returns>
         [HttpPost("forgot-password")]
+        [ProducesResponseType(typeof(ForgotPasswordResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ForgotPasswordResponseDto>> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             try
             {
                 var response = await _authService.ForgotPasswordAsync(forgotPasswordDto);
@@ -70,7 +99,7 @@ namespace Server.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during password reset");
+                _logger.LogError(ex, "Error during password reset for {Email}", forgotPasswordDto.Email);
                 return StatusCode(500, new { message = "An error occurred while processing your request" });
             }
         }

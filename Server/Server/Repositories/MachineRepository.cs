@@ -1,0 +1,114 @@
+using Microsoft.EntityFrameworkCore;
+using Server.Data;
+using Server.Models;
+
+namespace Server.Repositories
+{
+    public class MachineRepository : IMachineRepository
+    {
+        private readonly ApplicationDbContext _context;
+
+        public MachineRepository(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<IEnumerable<Machine>> GetAllAsync()
+        {
+            return await _context.Machines
+                .Include(m => m.Location)
+                .Include(m => m.Tubes)
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+        }
+
+        public async Task<Machine?> GetByIdAsync(int id)
+        {
+            return await _context.Machines
+                .Include(m => m.Location)
+                .Include(m => m.Tubes.OrderBy(t => t.TubeIndex))
+                .FirstOrDefaultAsync(m => m.Id == id);
+        }
+
+        public async Task<Machine?> GetByNameAsync(string name)
+        {
+            return await _context.Machines
+                .Include(m => m.Location)
+                .Include(m => m.Tubes.OrderBy(t => t.TubeIndex))
+                .FirstOrDefaultAsync(m => m.Name == name);
+        }
+
+        public async Task<IEnumerable<Machine>> GetByStatusAsync(MachineStatus status)
+        {
+            return await _context.Machines
+                .Include(m => m.Location)
+                .Include(m => m.Tubes)
+                .Where(m => m.Status == status)
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<Machine>> GetByLocationAsync(string country, string? city = null)
+        {
+            var query = _context.Machines
+                .Include(m => m.Location)
+                .Include(m => m.Tubes)
+                .Where(m => m.Location.Country == country);
+
+            if (!string.IsNullOrWhiteSpace(city))
+            {
+                query = query.Where(m => m.Location.City == city);
+            }
+
+            return await query.OrderBy(m => m.Name).ToListAsync();
+        }
+
+        public async Task<Machine> CreateAsync(Machine machine)
+        {
+            _context.Machines.Add(machine);
+            await _context.SaveChangesAsync();
+            
+            // Reload with navigation properties
+            return await GetByIdAsync(machine.Id) ?? machine;
+        }
+
+        public async Task<Machine> UpdateAsync(Machine machine)
+        {
+            _context.Machines.Update(machine);
+            await _context.SaveChangesAsync();
+            
+            // Reload with navigation properties
+            return await GetByIdAsync(machine.Id) ?? machine;
+        }
+
+        public async Task<bool> DeleteAsync(int id)
+        {
+            var machine = await _context.Machines.FindAsync(id);
+            if (machine == null)
+            {
+                return false;
+            }
+
+            _context.Machines.Remove(machine);
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        public async Task<bool> ExistsAsync(int id)
+        {
+            return await _context.Machines.AnyAsync(m => m.Id == id);
+        }
+
+        public async Task<bool> ExistsByNameAsync(string name, int? excludeId = null)
+        {
+            var query = _context.Machines.Where(m => m.Name == name);
+            
+            if (excludeId.HasValue)
+            {
+                query = query.Where(m => m.Id != excludeId.Value);
+            }
+
+            return await query.AnyAsync();
+        }
+    }
+}

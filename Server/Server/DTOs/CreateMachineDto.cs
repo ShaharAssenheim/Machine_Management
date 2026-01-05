@@ -1,0 +1,44 @@
+using Server.Models;
+using System.ComponentModel.DataAnnotations;
+
+namespace Server.DTOs
+{
+    public class CreateMachineDto
+    {
+        [Required]
+        [MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public ModelType Model { get; set; }
+
+        [Required]
+        public MachineStatus Status { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string PlcVersion { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(100)]
+        public string AcsVersion { get; set; } = string.Empty;
+
+        [Required]
+        [Range(0, 10)]
+        public int TubesNumber { get; set; }
+
+        [Required]
+        public List<TubeDto> Tubes { get; set; } = new List<TubeDto>();
+
+        [Required]
+        [MaxLength(200)]
+        public string Owner { get; set; } = string.Empty;
+
+        [Required]
+        [MaxLength(200)]
+        public string TeamviewerName { get; set; } = string.Empty;
+
+        [Required]
+        public LocationDto Location { get; set; } = new LocationDto();
+    }
+}

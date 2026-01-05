@@ -1,0 +1,21 @@
+using Server.Models;
+
+namespace Server.DTOs
+{
+    public class MachineDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public ModelType Model { get; set; }
+        public MachineStatus Status { get; set; }
+        public string PlcVersion { get; set; } = string.Empty;
+        public string AcsVersion { get; set; } = string.Empty;
+        public int TubesNumber { get; set; }
+        public List<TubeDto> Tubes { get; set; } = new List<TubeDto>();
+        public string Owner { get; set; } = string.Empty;
+        public string TeamviewerName { get; set; } = string.Empty;
+        public LocationDto Location { get; set; } = new LocationDto();
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+    }
+}

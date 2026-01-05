@@ -1,0 +1,111 @@
+﻿using Microsoft.EntityFrameworkCore;
+using Server.Data;
+using Server.Models;
+
+namespace Server.Data
+{
+    public static class DbSeeder
+    {
+        public static async Task SeedAsync(ApplicationDbContext context)
+        {
+            // Check if database already has data
+            if (await context.Machines.AnyAsync())
+            {
+                return; // Database already seeded
+            }
+
+            var machines = new List<Machine>
+            {
+                new Machine
+                {
+                    Name = "M15",
+                    Model = ModelType.Onyx3200,
+                    Image = "/ONYX-3000.png",
+                    Status = MachineStatus.Running,
+                    PlcVersion = "Siemens S7-1500 FW 2.9",
+                    AcsVersion = "ACS SPiiPlus v2.40",
+                    TubesNumber = 2,
+                    Owner = "Shahar Assenheim",
+                    TeamviewerName = "XRM5000-RIG-01",
+                    Country = "Israel",
+                    City = "Migdal Haemek",
+                    Tubes = new List<Tube>
+                    {
+                        new Tube
+                        {
+                            TubeIndex = 1,
+                            TubeType = TubeType.MXR,
+                            PurgingConnected = true,
+                            ShutterExists = true
+                        },
+                        new Tube
+                        {
+                            TubeIndex = 2,
+                            TubeType = TubeType.ColorsTW,
+                            PurgingConnected = true,
+                            ShutterExists = true
+                        }
+                    }
+                },
+                new Machine
+                {
+                    Name = "M16",
+                    Model = ModelType.Onyx3000,
+                    Image = "/ONYX-3000.png",
+                    Status = MachineStatus.Idle,
+                    PlcVersion = "Siemens S7-1200 FW 2.7",
+                    AcsVersion = "ACS SPiiPlus v2.35",
+                    TubesNumber = 1,
+                    Owner = "Dana Cohen",
+                    TeamviewerName = "ONYX3000-IL-02",
+                    Country = "Japan",
+                    City = "Tokyo",
+                    Tubes = new List<Tube>
+                    {
+                        new Tube
+                        {
+                            TubeIndex = 1,
+                            TubeType = TubeType.Petrick,
+                            PurgingConnected = false,
+                            ShutterExists = true
+                        }
+                    }
+                },
+                new Machine
+                {
+                    Name = "M17",
+                    Model = ModelType.Onyx3200,
+                    Image = "/ONYX-3000.png",
+                    Status = MachineStatus.Maintenance,
+                    PlcVersion = "Siemens S7-1500 FW 2.9",
+                    AcsVersion = "ACS SPiiPlus v2.40",
+                    TubesNumber = 2,
+                    Owner = "Alex Green",
+                    TeamviewerName = "ONYX3200-DE-01",
+                    Country = "Germany",
+                    City = "Berlin",
+                    Tubes = new List<Tube>
+                    {
+                        new Tube
+                        {
+                            TubeIndex = 1,
+                            TubeType = TubeType.ColorsTAu,
+                            PurgingConnected = true,
+                            ShutterExists = false
+                        },
+                        new Tube
+                        {
+                            TubeIndex = 2,
+                            TubeType = TubeType.ColorsTMo,
+                            PurgingConnected = false,
+                            ShutterExists = true
+                        }
+                    }
+                }
+            };
+
+            context.Machines.AddRange(machines);
+            await context.SaveChangesAsync();
+        }
+    }
+}

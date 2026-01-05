@@ -1,0 +1,109 @@
+### Machine Management API - Test Requests
+### Replace {{baseUrl}} with your actual server URL (e.g., https://localhost:7123)
+
+@baseUrl = https://localhost:7123/api
+
+### Get all machines
+GET {{baseUrl}}/machines
+Content-Type: application/json
+
+### Get machine by ID
+GET {{baseUrl}}/machines/1
+Content-Type: application/json
+
+### Get machine by name
+GET {{baseUrl}}/machines/by-name/M15
+Content-Type: application/json
+
+### Get machines by status (Running, Idle, Maintenance, Error)
+GET {{baseUrl}}/machines/by-status/Running
+Content-Type: application/json
+
+### Get machines by location (country only)
+GET {{baseUrl}}/machines/by-location?country=Israel
+Content-Type: application/json
+
+### Get machines by location (country and city)
+GET {{baseUrl}}/machines/by-location?country=Israel&city=Migdal%20Haemek
+Content-Type: application/json
+
+### Create a new machine
+POST {{baseUrl}}/machines
+Content-Type: application/json
+
+{
+  "name": "M18",
+  "model": "Onyx3200",
+  "image": "/ONYX-3000.png",
+  "status": "Running",
+  "plcVersion": "Siemens S7-1500 FW 2.9",
+  "acsVersion": "ACS SPiiPlus v2.40",
+  "tubesNumber": 2,
+  "tubes": [
+    {
+      "tubeIndex": 1,
+      "tubeType": "MXR",
+      "purgingConnected": true,
+      "shutterExists": true
+    },
+    {
+      "tubeIndex": 2,
+      "tubeType": "ColorsTW",
+      "purgingConnected": true,
+      "shutterExists": true
+    }
+  ],
+  "owner": "John Doe",
+  "teamviewerName": "ONYX-TEST-01",
+  "location": {
+    "country": "USA",
+    "city": "New York"
+  }
+}
+
+### Update machine (full update)
+PUT {{baseUrl}}/machines/1
+Content-Type: application/json
+
+{
+  "name": "M15-Updated",
+  "model": "Onyx3200",
+  "image": "/ONYX-3000.png",
+  "status": "Maintenance",
+  "plcVersion": "Siemens S7-1500 FW 3.0",
+  "acsVersion": "ACS SPiiPlus v2.50",
+  "tubesNumber": 2,
+  "tubes": [
+    {
+      "tubeIndex": 1,
+      "tubeType": "MXR",
+      "purgingConnected": true,
+      "shutterExists": true
+    },
+    {
+      "tubeIndex": 2,
+      "tubeType": "ColorsTW",
+      "purgingConnected": true,
+      "shutterExists": true
+    }
+  ],
+  "owner": "Shahar Assenheim",
+  "teamviewerName": "XRM5000-RIG-01",
+  "location": {
+    "country": "Israel",
+    "city": "Migdal Haemek"
+  }
+}
+
+### Partial update machine (PATCH)
+PATCH {{baseUrl}}/machines/1
+Content-Type: application/json
+
+{
+  "status": "Idle",
+  "plcVersion": "Siemens S7-1500 FW 3.1"
+}
+
+### Delete machine
+DELETE {{baseUrl}}/machines/1
+Content-Type: application/json

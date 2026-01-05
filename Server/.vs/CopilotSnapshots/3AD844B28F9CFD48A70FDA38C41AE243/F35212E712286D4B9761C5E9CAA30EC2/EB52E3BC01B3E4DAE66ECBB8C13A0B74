@@ -1,0 +1,99 @@
+﻿using Microsoft.EntityFrameworkCore;
+using Server.Models;
+
+namespace Server.Data
+{
+    public class ApplicationDbContext : DbContext
+    {
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+            : base(options)
+        {
+        }
+
+        public DbSet<Machine> Machines { get; set; }
+        public DbSet<Tube> Tubes { get; set; }
+        public DbSet<Location> Locations { get; set; }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // Configure Machine entity
+            modelBuilder.Entity<Machine>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Name).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.PlcVersion).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.AcsVersion).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.Owner).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.TeamviewerName).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.Image).HasMaxLength(500);
+                entity.Property(e => e.CreatedAt).HasDefaultValueSql("GETUTCDATE()");
+
+                // Configure enum to string conversion
+                entity.Property(e => e.Status)
+                    .HasConversion<string>()
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.Model)
+                    .HasConversion<string>()
+                    .HasMaxLength(50);
+
+                // Configure one-to-one relationship with Location
+                entity.HasOne(e => e.Location)
+                    .WithOne(l => l.Machine)
+                    .HasForeignKey<Location>(l => l.MachineId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Configure one-to-many relationship with Tubes
+                entity.HasMany(e => e.Tubes)
+                    .WithOne(t => t.Machine)
+                    .HasForeignKey(t => t.MachineId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // Create index on Name for faster searches
+                entity.HasIndex(e => e.Name);
+                entity.HasIndex(e => e.Status);
+            });
+
+            // Configure Tube entity
+            modelBuilder.Entity<Tube>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.TubeIndex).IsRequired();
+                
+                entity.Property(e => e.TubeType)
+                    .HasConversion<string>()
+                    .HasMaxLength(50);
+
+                // Create composite index for machine and tube index
+                entity.HasIndex(e => new { e.MachineId, e.TubeIndex });
+            });
+
+            // Configure Location entity
+            modelBuilder.Entity<Location>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Country).IsRequired().HasMaxLength(100);
+                entity.Property(e => e.City).IsRequired().HasMaxLength(100);
+
+                // Create index for location searches
+                entity.HasIndex(e => new { e.Country, e.City });
+            });
+        }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            // Update UpdatedAt timestamp for modified entities
+            var entries = ChangeTracker.Entries<Machine>()
+                .Where(e => e.State == EntityState.Modified);
+
+            foreach (var entry in entries)
+            {
+                entry.Entity.UpdatedAt = DateTime.UtcNow;
+            }
+
+            return base.SaveChangesAsync(cancellationToken);
+        }
+    }
+}

@@ -93,12 +93,16 @@ export const ForgotPassword: React.FC<ForgotPasswordProps> = ({ onBackToLogin })
 
               <motion.button
                 onClick={onBackToLogin}
-                className="w-full py-3 bg-gradient-to-r from-accent-primary to-accent-secondary text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2"
+                style={{ 
+                  background: 'linear-gradient(to right, #2596be, #1d7a9e)',
+                  color: '#ffffff'
+                }}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <ArrowLeft size={18} />
-                Back to Login
+                <ArrowLeft size={18} style={{ color: '#ffffff' }} />
+                <span style={{ color: '#ffffff' }}>Back to Login</span>
               </motion.button>
             </div>
           </div>

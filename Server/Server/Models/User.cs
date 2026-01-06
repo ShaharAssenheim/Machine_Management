@@ -21,6 +21,8 @@ namespace Server.Models
 
         public bool IsAdmin { get; set; } = false;
 
+        public bool RequirePasswordChange { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime? LastLoginAt { get; set; }

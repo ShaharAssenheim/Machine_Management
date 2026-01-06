@@ -15,12 +15,14 @@ namespace Server.Services
         private readonly IUserRepository _userRepository;
         private readonly IConfiguration _configuration;
         private readonly IEmailService _emailService;
+        private readonly IEmailValidationService _emailValidationService;
 
-        public AuthService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService)
+        public AuthService(IUserRepository userRepository, IConfiguration configuration, IEmailService emailService, IEmailValidationService emailValidationService)
         {
             _userRepository = userRepository;
             _configuration = configuration;
             _emailService = emailService;
+            _emailValidationService = emailValidationService;
         }
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
@@ -29,6 +31,13 @@ namespace Server.Services
             if (!registerDto.Email.EndsWith("@rigaku.com", StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("Only Rigaku email addresses (@rigaku.com) are allowed.");
+            }
+
+            // Validate email is real/legal
+            var isValidEmail = await _emailValidationService.IsValidEmailAsync(registerDto.Email);
+            if (!isValidEmail)
+            {
+                throw new InvalidOperationException("The email address is not valid or does not exist.");
             }
 
             // Check if user already exists
@@ -58,6 +67,9 @@ namespace Server.Services
 
             await _userRepository.CreateAsync(user);
 
+            // Send welcome email
+            await SendWelcomeEmailAsync(user.Email, user.Username);
+
             // Generate JWT token
             var token = GenerateJwtToken(user.Email, user.Username, user.Id, user.IsAdmin);
 
@@ -67,6 +79,7 @@ namespace Server.Services
                 Username = user.Username,
                 Email = user.Email,
                 IsAdmin = user.IsAdmin,
+                RequirePasswordChange = user.RequirePasswordChange,
                 ExpiresAt = DateTime.UtcNow.AddHours(24)
             };
         }
@@ -99,6 +112,7 @@ namespace Server.Services
                 Username = user.Username,
                 Email = user.Email,
                 IsAdmin = user.IsAdmin,
+                RequirePasswordChange = user.RequirePasswordChange,
                 ExpiresAt = DateTime.UtcNow.AddHours(24)
             };
         }
@@ -119,6 +133,7 @@ namespace Server.Services
                 new Claim(ClaimTypes.Name, username),
                 new Claim(ClaimTypes.Email, email),
                 new Claim(ClaimTypes.Role, isAdmin ? "Admin" : "User"),
+                new Claim("IsAdmin", isAdmin.ToString()),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -135,26 +150,29 @@ namespace Server.Services
 
         public async Task<ForgotPasswordResponseDto> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto)
         {
-            // Find user by email
-            var user = await _userRepository.GetByEmailAsync(forgotPasswordDto.Email);
-            if (user == null)
+            try
             {
-                // Don't reveal if email exists or not for security
-                return new ForgotPasswordResponseDto
+                // Find user by email
+                var user = await _userRepository.GetByEmailAsync(forgotPasswordDto.Email);
+                if (user == null)
                 {
-                    Message = "If an account with this email exists, a password reset has been sent."
-                };
-            }
+                    // Don't reveal if email exists or not for security
+                    return new ForgotPasswordResponseDto
+                    {
+                        Message = "If an account with this email exists, a password reset has been sent."
+                    };
+                }
 
-            // Generate temporary password (8 characters: uppercase, lowercase, digits)
-            var tempPassword = GenerateTemporaryPassword();
+                // Generate temporary password (8 characters: uppercase, lowercase, digits)
+                var tempPassword = GenerateTemporaryPassword();
 
-            // Update user password
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
-            await _userRepository.UpdateAsync(user);
+                // Update user password and set flag to require password change
+                user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(tempPassword);
+                user.RequirePasswordChange = true;
+                await _userRepository.UpdateAsync(user);
 
-            // Send email with temporary password
-            var emailBody = $@"
+                // Send email with temporary password
+                var emailBody = $@"
                 <html>
                 <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
                     <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
@@ -165,11 +183,15 @@ namespace Server.Services
                             <h2 style='color: #2596be;'>Password Reset</h2>
                             <p>Hello {user.Username},</p>
                             <p>You have requested to reset your password. Your temporary password is:</p>
-                            <div style='background: white; padding: 15px; border-left: 4px solid #2596be; margin: 20px 0; font-family: monospace; font-size: 18px; font-weight: bold;'>
-                                {tempPassword}
+                            <div style='background: white; padding: 20px; border-left: 4px solid #2596be; margin: 20px 0;'>
+                                <p style='margin: 0;'><strong>Temporary Password:</strong></p>
+                                <p style='margin: 10px 0 0 0; font-family: monospace; font-size: 18px; font-weight: bold;'>{tempPassword}</p>
                             </div>
                             <p><strong>Important:</strong> Please log in with this temporary password and change it immediately in your account settings.</p>
                             <p>If you didn't request this password reset, please contact your system administrator immediately.</p>
+                            <div style='text-align: center; margin: 30px 0;'>
+                                <a href='http://localhost:3001' style='background: #2596be; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>Go to Login</a>
+                            </div>
                             <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
                             <p style='color: #666; font-size: 12px;'>This is an automated message from the Machine Control System. Please do not reply to this email.</p>
                         </div>
@@ -177,11 +199,54 @@ namespace Server.Services
                 </body>
                 </html>";
 
-            await _emailService.SendEmailAsync(user.Email, "Password Reset - Machine Control System", emailBody);
+                // This will throw an exception if email fails to send
+                await _emailService.SendEmailAsync(user.Email, "Password Reset - Machine Control System", emailBody);
 
-            return new ForgotPasswordResponseDto
+                return new ForgotPasswordResponseDto
+                {
+                    Message = "If an account with this email exists, a password reset has been sent."
+                };
+            }
+            catch (Exception ex)
             {
-                Message = "If an account with this email exists, a password reset has been sent."
+                // Log the error but don't reveal details to the user for security
+                throw new InvalidOperationException($"Failed to process password reset request: {ex.Message}", ex);
+            }
+        }
+
+        public async Task<ChangePasswordResponseDto> ChangePasswordAsync(string userEmail, ChangePasswordDto changePasswordDto)
+        {
+            // Find user by email
+            var user = await _userRepository.GetByEmailAsync(userEmail);
+            if (user == null)
+            {
+                throw new UnauthorizedAccessException("User not found.");
+            }
+
+            // If current password is provided, verify it (for normal password changes)
+            // If RequirePasswordChange is true, skip verification (user just logged in with temp password)
+            if (!user.RequirePasswordChange && !string.IsNullOrEmpty(changePasswordDto.CurrentPassword))
+            {
+                if (!BCrypt.Net.BCrypt.Verify(changePasswordDto.CurrentPassword, user.PasswordHash))
+                {
+                    throw new UnauthorizedAccessException("Current password is incorrect.");
+                }
+
+                // Check if new password is different from current
+                if (changePasswordDto.CurrentPassword == changePasswordDto.NewPassword)
+                {
+                    throw new InvalidOperationException("New password must be different from current password.");
+                }
+            }
+
+            // Update password and clear the RequirePasswordChange flag
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(changePasswordDto.NewPassword);
+            user.RequirePasswordChange = false;
+            await _userRepository.UpdateAsync(user);
+
+            return new ChangePasswordResponseDto
+            {
+                Message = "Password changed successfully."
             };
         }
 
@@ -208,6 +273,39 @@ namespace Server.Services
 
             // Shuffle the password
             return new string(password.OrderBy(x => random.Next()).ToArray());
+        }
+
+        private async Task SendWelcomeEmailAsync(string email, string username)
+        {
+            var emailBody = $@"
+                <html>
+                <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                    <div style='max-width: 600px; margin: 0 auto; padding: 20px;'>
+                        <div style='background: linear-gradient(135deg, #2596be 0%, #1d7a9e 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;'>
+                            <h1 style='color: white; margin: 0;'>Welcome to Machine Control System!</h1>
+                        </div>
+                        <div style='background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;'>
+                            <h2 style='color: #2596be;'>Registration Successful</h2>
+                            <p>Hello {username},</p>
+                            <p>Congratulations! Your registration has been completed successfully.</p>
+                            <div style='background: white; padding: 20px; border-left: 4px solid #2596be; margin: 20px 0;'>
+                                <p style='margin: 0;'><strong>Your Account Details:</strong></p>
+                                <p style='margin: 10px 0 0 0;'>Email: <strong>{email}</strong></p>
+                                <p style='margin: 5px 0 0 0;'>Username: <strong>{username}</strong></p>
+                            </div>
+                            <p>You can now log in to the Machine Control System and start managing your machines.</p>
+                            <div style='text-align: center; margin: 30px 0;'>
+                                <a href='http://localhost:3001' style='background: #2596be; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;'>Go to Dashboard</a>
+                            </div>
+                            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+                            <hr style='border: none; border-top: 1px solid #ddd; margin: 30px 0;'>
+                            <p style='color: #666; font-size: 12px;'>This is an automated message from the Machine Control System. Please do not reply to this email.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>";
+
+            await _emailService.SendEmailAsync(email, "Welcome to Machine Control System", emailBody);
         }
     }
 }

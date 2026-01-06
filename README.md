@@ -7,15 +7,20 @@ A comprehensive production machine management system with real-time monitoring, 
 - [Overview](#overview)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
   - [Quick Start](#quick-start)
   - [Server Setup](#server-setup)
   - [Client Setup](#client-setup)
 - [Authentication System](#authentication-system)
+  - [Password Reset Flow](#password-reset-flow)
+  - [Email Verification](#email-verification)
+- [Admin User Management](#admin-user-management)
 - [API Documentation](#api-documentation)
 - [Global Fleet Map](#global-fleet-map)
 - [Database](#database)
+- [Code Quality & Optimizations](#code-quality--optimizations)
 - [Development](#development)
 - [Production Deployment](#production-deployment)
 - [Troubleshooting](#troubleshooting)
@@ -31,10 +36,13 @@ ProMMS (Production Machine Management System) is a professional, modern dashboar
 ### 🔐 Security & Authentication
 - **JWT Token Authentication**: Industry-standard JSON Web Tokens for stateless authentication
 - **BCrypt Password Hashing**: Automatic salting and secure password storage
-- **Strong Password Requirements**: Enterprise-grade password policies
+- **Strong Password Requirements**: Enterprise-grade password policies with real-time validation
 - **Email Domain Validation**: Only @rigaku.com email addresses allowed
+- **Email Verification**: Verification emails sent upon registration with 24-hour token expiry
+- **Password Reset**: Secure temporary password generation with forced password change
 - **Protected API Endpoints**: All machine data endpoints require authentication
-- **Role-Based Access**: Admin and user roles
+- **Role-Based Access Control**: Admin and user roles with granular permissions
+- **Admin User Management**: Full CRUD operations for user management (admin only)
 
 ### 📊 Machine Management
 - **Real-time Machine Monitoring**: Live status updates for all production units
@@ -81,6 +89,83 @@ ProMMS (Production Machine Management System) is a professional, modern dashboar
 - Repository pattern for data access
 - Service layer for business logic
 - DTO pattern for API contracts
+- SOLID principles implementation
+- Dependency injection throughout
+- Comprehensive error handling
+
+---
+
+## Architecture
+
+### Backend Architecture
+
+The server follows **Clean Architecture** and **SOLID principles**:
+
+#### Layers
+
+1. **Controllers** (API Layer)
+   - Handle HTTP requests/responses
+   - Input validation
+   - Route definition
+   - No business logic
+
+2. **Services** (Business Logic Layer)
+   - `IAuthService` / `AuthService`: Authentication, registration, password management
+   - `IMachineService` / `MachineService`: Machine operations
+   - `IUserManagementService` / `UserManagementService`: User CRUD operations
+   - `IEmailService` / `EmailService`: Email sending functionality
+   - Business rules and validation
+
+3. **Repositories** (Data Access Layer)
+   - `IUserRepository` / `UserRepository`: User data access
+   - `IMachineRepository` / `MachineRepository`: Machine data access
+   - `ILocationRepository` / `LocationRepository`: Location data access
+   - EF Core abstraction
+
+4. **Models** (Domain Layer)
+   - `User`: User entity with authentication properties
+   - `Machine`: Machine entity with status tracking
+   - `Location`: Geographic data for machines
+   - `Tube`: Machine component details
+
+5. **DTOs** (Data Transfer Layer)
+   - Request/Response models
+   - Data validation attributes
+   - API contracts
+
+### SOLID Principles Applied
+
+#### Single Responsibility Principle (SRP)
+- Each class has one reason to change
+- Controllers handle HTTP, Services handle business logic, Repositories handle data
+- Configuration methods extracted into focused functions
+
+#### Open/Closed Principle (OCP)
+- Services use interfaces for easy extension
+- New features can be added without modifying existing code
+
+#### Liskov Substitution Principle (LSP)
+- All interface implementations follow contracts
+- Repositories can be swapped with different implementations
+
+#### Interface Segregation Principle (ISP)
+- Focused interfaces (`IMachineRepository`, `IUserRepository`, etc.)
+- Clients depend only on methods they use
+
+#### Dependency Inversion Principle (DIP)
+- Controllers depend on abstractions (interfaces)
+- Dependencies injected via constructor
+- All services registered in DI container
+
+### Frontend Architecture
+
+**Component-Based Architecture** with React:
+
+- **Components**: Reusable UI components (Login, Register, MapView, etc.)
+- **Context Providers**: Global state management (AuthContext, ThemeContext)
+- **Services**: API communication layer (machineApi.ts)
+- **Types**: TypeScript definitions for type safety
+- **Hooks**: Custom hooks for logic reuse
 
 ---
 
@@ -263,11 +348,13 @@ The production build will be in the `dist` directory.
 
 - **JWT Token Authentication**: Secure, stateless authentication
 - **Password Security**: BCrypt hashing with automatic salting
-- **Email Validation**: Only @rigaku.com addresses accepted
-- **Username Extraction**: Automatic from email (e.g., `shahar.assenheim@rigaku.com` → `shahar.assenheim`)
+- **Email Validation**: Only @rigaku.com addresses accepted with real email verification
+- **Username Extraction**: Automatic from email (e.g., `shahar.assenheim@rigaku.com` → `Shahar Assenheim`)
 - **Protected Routes**: All machine endpoints require valid JWT token
 - **Token Expiration**: 24-hour token lifetime
 - **Admin Support**: IsAdmin flag for role-based access
+- **Email Verification**: Automatic verification emails with 24-hour token expiry
+- **Password Reset**: Secure temporary password with forced change on first login
 
 ### Password Requirements
 
@@ -275,31 +362,241 @@ The production build will be in the `dist` directory.
 - At least one uppercase letter
 - At least one lowercase letter
 - At least one digit
-- At least one special character (@$!%*?&)
+
+**Real-time Validation**: Password requirements are validated in real-time with visual feedback (check marks/X marks) as users type.
 
 ### Authentication Flow
 
 #### Registration
 1. User enters @rigaku.com email and strong password
-2. Client validates format and requirements
+2. Client validates format and requirements with real-time feedback
 3. POST to `/api/auth/register`
-4. Server validates and hashes password
-5. Server creates user and generates JWT
-6. Client stores token in localStorage
-7. User is logged in
+4. Server validates email domain (@rigaku.com)
+5. Server checks email validity using email validation service
+6. Server hashes password using BCrypt
+7. Server creates user and generates JWT
+8. **Server sends welcome email automatically**
+9. Client stores token in localStorage
+10. User is logged in and redirected to dashboard
 
 #### Login
 1. User enters email and password
 2. POST to `/api/auth/login`
 3. Server verifies credentials
-4. Server generates JWT token
-5. Client stores token and updates state
+4. Server generates JWT token with user claims
+5. Server updates last login timestamp
+6. Client stores token and user data
+7. **If RequirePasswordChange flag is set, redirect to password change page**
+8. Otherwise, redirect to dashboard
 
 #### Protected API Access
 1. Client includes token in Authorization header: `Bearer {token}`
 2. Server validates token signature and expiration
-3. Server processes request if valid
-4. Returns 401 Unauthorized if invalid
+3. Server extracts user claims (email, username, ID, role)
+4. Server processes request if valid
+5. Returns 401 Unauthorized if invalid/expired
+
+---
+
+### Password Reset Flow
+
+Complete password reset implementation with forced password change:
+
+#### Requesting Password Reset
+
+1. User clicks "Forgot Password" on login page
+2. User enters registered email address
+3. POST to `/api/auth/forgot-password`
+4. Server validates email exists in system
+5. Server generates secure temporary password (12 characters)
+6. Server sets `RequirePasswordChange = true` flag
+7. Server updates user's password hash with temporary password
+8. **Server sends password reset email with temporary password**
+9. User receives beautifully formatted email with:
+   - Temporary password clearly displayed
+   - Instructions to log in and change password
+   - Security warning if request was not made by them
+   - 24-hour validity notice
+
+#### Logging in with Temporary Password
+
+1. User logs in with email and temporary password
+2. Server authenticates successfully
+3. Server returns JWT with `requirePasswordChange: true` flag
+4. **Client detects flag and redirects to Change Password page** (not dashboard)
+5. User sees dedicated password change screen (full page, not modal)
+
+#### Changing Password
+
+1. User sees "Change Password Required" page
+2. User enters new password (with real-time validation)
+3. User confirms new password (visual match indicator)
+4. POST to `/api/auth/change-password` (no current password needed)
+5. Server validates new password meets requirements
+6. Server hashes new password
+7. Server sets `RequirePasswordChange = false`
+8. Server updates user record
+9. **Client automatically redirects to main dashboard**
+
+**Security Features:**
+- Temporary passwords are immediately hashed (never stored plain text)
+- User cannot access main app until password is changed
+- New password must meet all strength requirements
+- Real-time validation prevents weak passwords
+- No email in query string (uses Authorization header)
+
+---
+
+### Email Verification
+
+Comprehensive email verification system to ensure valid user registrations:
+
+#### Verification Flow
+
+1. **During Registration**:
+   - User registers with @rigaku.com email
+   - System generates unique verification token (GUID)
+   - Token expiry set to 24 hours
+   - User account created with `EmailVerified = false`
+   - **Welcome email sent automatically with verification link**
+
+2. **Email Content**:
+   - Professional HTML design matching system branding
+   - Clear "Verify Email Address" button
+   - Clickable verification link: `https://your-domain/api/auth/verify-email?token={token}`
+   - 24-hour expiration notice
+   - Instructions for users who didn't register
+
+3. **Verification Process**:
+   - User clicks verification link in email
+   - GET to `/api/auth/verify-email?token={token}`
+   - Server validates token exists and hasn't expired
+   - Server sets `EmailVerified = true`
+   - Server clears verification token
+   - User sees success HTML page
+
+**Email Configuration** (appsettings.json):
+```json
+{
+  "Email": {
+    "SmtpHost": "smtp.gmail.com",
+    "SmtpPort": "587",
+    "SmtpUsername": "your-email@gmail.com",
+    "SmtpPassword": "your-app-password",
+    "FromEmail": "noreply@rigaku.com",
+    "FromName": "Machine Control System"
+  }
+}
+```
+
+**Note**: If SMTP not configured, emails are logged to console (development mode).
+
+---
+
+## Admin User Management
+
+Comprehensive user management system for administrators:
+
+### Features
+
+- **View All Users**: Complete user list with details
+- **Create Users**: Admin can create user accounts
+- **Edit Users**: Modify user information, passwords, roles
+- **Delete Users**: Remove user accounts (cannot delete self)
+- **Role Management**: Assign/remove admin privileges
+- **Email Verification Control**: Manually verify user emails
+
+### Admin Panel UI
+
+**User Table Columns**:
+- ID
+- Username (with admin badge)
+- Email
+- Verification Status (verified/unverified badges)
+- Creation Date
+- Last Login Date
+- Actions (Edit/Delete buttons)
+
+**Create User Modal**:
+- Email (required, validated)
+- Username (required)
+- Password (required, min 8 characters)
+- Admin checkbox
+- Email Verified checkbox (default: true)
+
+**Edit User Modal**:
+- Email (optional, must be unique)
+- Username (optional)
+- Password (optional, leave blank to keep current)
+- Admin checkbox
+- Email Verified checkbox
+
+### Security
+
+- All endpoints require authentication (`[Authorize]`)
+- All endpoints require admin privileges
+- Returns `403 Forbidden` for non-admin users
+- Prevents admins from deleting their own account
+- Email uniqueness enforced
+- Passwords automatically hashed using BCrypt
+
+### Admin API Endpoints
+
+#### Get All Users
+```
+GET /api/users
+Authorization: Bearer {admin-token}
+```
+
+#### Get User by ID
+```
+GET /api/users/{id}
+Authorization: Bearer {admin-token}
+```
+
+#### Create User
+```
+POST /api/users
+Authorization: Bearer {admin-token}
+Content-Type: application/json
+
+{
+  "email": "newuser@rigaku.com",
+  "username": "New User",
+  "password": "SecurePass123",
+  "isAdmin": false,
+  "emailVerified": true
+}
+```
+
+#### Update User
+```
+PUT /api/users/{id}
+Authorization: Bearer {admin-token}
+Content-Type: application/json
+
+{
+  "email": "updated@rigaku.com",
+  "username": "Updated Name",
+  "password": "NewPassword123",  // Optional
+  "isAdmin": true,
+  "emailVerified": true
+}
+```
+
+**Note**: All fields optional in update. Only provided fields are updated.
+
+#### Delete User
+```
+DELETE /api/users/{id}
+Authorization: Bearer {admin-token}
+```
+
+**Response**: 204 No Content (success)
+
+**Error**: 400 Bad Request if trying to delete self
+
+---
 
 ### API Endpoints
 
@@ -311,6 +608,62 @@ Request:
 {
   "email": "user@rigaku.com",
   "password": "SecurePass123!"
+}
+
+Response:
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "username": "User",
+  "email": "user@rigaku.com",
+  "isAdmin": false,
+  "requirePasswordChange": false,
+  "expiresAt": "2026-01-07T12:00:00Z"
+}
+```
+
+**POST /api/auth/login**
+```json
+Request:
+{
+  "email": "user@rigaku.com",
+  "password": "SecurePass123!"
+}
+
+Response:
+{
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "username": "User",
+  "email": "user@rigaku.com",
+  "isAdmin": false,
+  "requirePasswordChange": false,
+  "expiresAt": "2026-01-07T12:00:00Z"
+}
+```
+
+**POST /api/auth/forgot-password**
+```json
+Request:
+{
+  "email": "user@rigaku.com"
+}
+
+Response:
+{
+  "message": "If an account with this email exists, a password reset has been sent."
+}
+```
+
+**POST /api/auth/change-password**
+```json
+Request:
+Authorization: Bearer {token}
+{
+  "newPassword": "NewSecurePass123!"
+}
+
+Response:
+{
+  "message": "Password changed successfully."
 }
 
 Response:
@@ -531,6 +884,138 @@ dotnet ef migrations script
 # Drop database
 dotnet ef database drop
 ```
+
+---
+
+## Code Quality & Optimizations
+
+### Clean Code Principles
+
+The codebase follows industry best practices and clean code principles:
+
+#### 1. **SOLID Principles**
+- **Single Responsibility**: Each class has one reason to change
+- **Open/Closed**: Services use interfaces for easy extension
+- **Liskov Substitution**: Interface implementations follow contracts
+- **Interface Segregation**: Focused, specific interfaces
+- **Dependency Inversion**: Controllers depend on abstractions
+
+#### 2. **Meaningful Names**
+- Clear method names: `GetMachineById`, `RegisterAsync`, `ConfigureDatabase`
+- Descriptive variable names: `authData`, `userData`, `machines`
+- Self-documenting code
+
+#### 3. **Small, Focused Functions**
+- Program.cs refactored from monolithic to modular
+- Each function does one thing well
+- Easy to test and maintain
+
+#### 4. **Consistent Error Handling**
+- Proper exception types (`InvalidOperationException`, `UnauthorizedAccessException`)
+- Meaningful error messages
+- Consistent error response format
+
+#### 5. **DRY (Don't Repeat Yourself)**
+- Removed duplicate error handling
+- Reusable helper functions
+- Shared validation logic
+
+### Performance Optimizations
+
+#### Server Optimizations
+
+1. **Async/Await Throughout**
+   - All database operations are async
+   - Non-blocking I/O operations
+   - Better scalability
+
+2. **Database Optimizations**
+   - Connection pooling (EF Core default)
+   - Retry logic for transient failures
+   - Proper indexes on frequently queried columns
+   - Efficient queries with EF Core
+
+3. **Streamlined Controllers**
+   - Removed try-catch blocks (handled by middleware)
+   - Comprehensive Swagger documentation
+   - Integer constraints on route parameters
+   - Reduced code duplication
+
+#### Client Optimizations
+
+1. **Reduced Logging Overhead**
+   - Removed 22+ console.log statements
+   - Production-ready code
+   - Better performance
+
+2. **Cleaner Service Layer**
+   - Removed excessive logging from API services
+   - Simplified error handling
+   - Better code maintainability
+
+3. **Optimized Component Rendering**
+   - Proper React hooks usage
+   - Memoization where needed
+   - Efficient state updates
+
+### Security Enhancements
+
+1. **Credentials Protection**
+   - Comprehensive .gitignore
+   - No sensitive data in source control
+   - Environment-based configuration
+
+2. **Input Validation**
+   - DTO validation attributes
+   - ModelState validation in controllers
+   - Client-side validation with real-time feedback
+
+3. **Best Practices**
+   - HTTPS redirection
+   - CORS properly configured
+   - Proper HTTP status codes
+   - JWT with secure secret keys
+
+### Code Organization
+
+#### Program.cs Refactoring
+
+Before: 130 lines with mixed concerns
+After: 180 lines, well-organized with focused methods:
+
+- `ConfigureServices()` - Service registration
+- `ConfigureDatabase()` - Database configuration
+- `RegisterRepositories()` - Repository DI
+- `RegisterServices()` - Service DI
+- `ConfigureAuthentication()` - JWT auth setup
+- `ConfigureCors()` - CORS policy
+- `ConfigureSwagger()` - API documentation
+- `ConfigureMiddleware()` - HTTP pipeline
+- `InitializeDatabaseAsync()` - Database initialization
+
+#### Controllers Enhancement
+
+- Removed repetitive try-catch blocks
+- Added comprehensive `ProducesResponseType` attributes
+- Consistent error response format
+- Improved logging with context
+- Better API documentation
+
+### Quality Metrics
+
+**Before Optimizations:**
+- Mixed concerns in configuration
+- Repetitive error handling
+- Excessive console logging
+- Less maintainable code
+
+**After Optimizations:**
+- Clean, focused functions
+- Consistent patterns
+- Production-ready
+- Highly maintainable
+- Better performance
+- Comprehensive documentation
 
 ---
 

@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 using Server.DTOs;
 using Server.Services;
 
@@ -83,6 +85,7 @@ namespace Server.Controllers
         /// <returns>Confirmation message</returns>
         [HttpPost("forgot-password")]
         [ProducesResponseType(typeof(ForgotPasswordResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         public async Task<ActionResult<ForgotPasswordResponseDto>> ForgotPassword([FromBody] ForgotPasswordDto forgotPasswordDto)
         {
@@ -97,11 +100,61 @@ namespace Server.Controllers
                 _logger.LogInformation("Password reset requested for email: {Email}", forgotPasswordDto.Email);
                 return Ok(response);
             }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogError(ex, "Failed to send password reset email for {Email}", forgotPasswordDto.Email);
+                return BadRequest(new { message = ex.Message });
+            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during password reset for {Email}", forgotPasswordDto.Email);
-                return StatusCode(500, new { message = "An error occurred while processing your request" });
+                _logger.LogError(ex, "Unexpected error during password reset for {Email}", forgotPasswordDto.Email);
+                return StatusCode(500, new { message = "An unexpected error occurred while processing your request" });
             }
         }
-    }
+
+        /// <summary>
+        /// Change user password
+        /// </summary>
+        /// <param name="changePasswordDto">Current and new password</param>
+        /// <returns>Confirmation message</returns>
+        [HttpPost("change-password")]
+        [Authorize]
+        [ProducesResponseType(typeof(ChangePasswordResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        public async Task<ActionResult<ChangePasswordResponseDto>> ChangePassword([FromBody] ChangePasswordDto changePasswordDto)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                var userEmail = User.FindFirst(ClaimTypes.Email)?.Value;
+                if (string.IsNullOrEmpty(userEmail))
+                {
+                    return Unauthorized(new { message = "User email not found in token." });
+                }
+
+                var response = await _authService.ChangePasswordAsync(userEmail, changePasswordDto);
+                _logger.LogInformation("Password changed successfully for user: {Email}", userEmail);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Password change failed: {Message}", ex.Message);
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning("Password change validation failed: {Message}", ex.Message);
+                return BadRequest(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error during password change");
+                return StatusCode(500, new { message = "An unexpected error occurred while changing password" });
+            }
+        }    }
 }

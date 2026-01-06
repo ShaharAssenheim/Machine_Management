@@ -33,6 +33,7 @@ namespace Server.DTOs
         public string Username { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public bool IsAdmin { get; set; }
+        public bool RequirePasswordChange { get; set; }
         public DateTime ExpiresAt { get; set; }
     }
 
@@ -44,6 +45,22 @@ namespace Server.DTOs
     }
 
     public class ForgotPasswordResponseDto
+    {
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class ChangePasswordDto
+    {
+        public string? CurrentPassword { get; set; }
+
+        [Required(ErrorMessage = "New password is required")]
+        [MinLength(8, ErrorMessage = "Password must be at least 8 characters")]
+        [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d@$!%*?&]{8,}$",
+            ErrorMessage = "Password must contain at least one uppercase letter, one lowercase letter, and one digit")]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
+    public class ChangePasswordResponseDto
     {
         public string Message { get; set; } = string.Empty;
     }

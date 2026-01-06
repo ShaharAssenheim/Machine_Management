@@ -8,6 +8,7 @@ interface User {
   username: string;
   email: string;
   isAdmin: boolean;
+  requirePasswordChange: boolean;
 }
 
 interface AuthResponse {
@@ -15,6 +16,7 @@ interface AuthResponse {
   username: string;
   email: string;
   isAdmin: boolean;
+  requirePasswordChange: boolean;
   expiresAt: string;
 }
 
@@ -36,6 +38,7 @@ interface AuthContextType {
   login: (data: LoginData) => Promise<void>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => void;
+  clearPasswordChangeRequirement: () => void;
   error: string | null;
 }
 
@@ -102,6 +105,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         username: authData.username,
         email: authData.email,
         isAdmin: authData.isAdmin,
+        requirePasswordChange: authData.requirePasswordChange,
       };
 
       setToken(authData.token);
@@ -142,6 +146,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         username: authData.username,
         email: authData.email,
         isAdmin: authData.isAdmin,
+        requirePasswordChange: authData.requirePasswordChange,
       };
 
       setToken(authData.token);
@@ -165,6 +170,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem(USER_KEY);
   };
 
+  const clearPasswordChangeRequirement = () => {
+    if (user) {
+      const updatedUser = { ...user, requirePasswordChange: false };
+      setUser(updatedUser);
+      localStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -173,6 +186,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     register,
     logout,
+    clearPasswordChangeRequirement,
     error,
   };
 

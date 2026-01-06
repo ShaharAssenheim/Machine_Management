@@ -9,9 +9,11 @@ import DetailView from './components/DetailView';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import MapView from './components/MapView';
+import UserManagement from './components/UserManagement';
 import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { ForgotPassword } from './components/ForgotPassword';
+import { ChangePassword } from './components/ChangePassword';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -168,6 +170,17 @@ const AppContent: React.FC = () => {
         <AnimatePresence mode="wait">
           {selectedMachine ? (
             <DetailView key="detail" machine={selectedMachine} onBack={() => setSelectedMachine(null)} />
+          ) : activeTab === 'users' ? (
+            <motion.div
+              key="users"
+              className="space-y-6 pb-20"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <UserManagement />
+            </motion.div>
           ) : activeTab === 'map' ? (
             <motion.div
               key="map"
@@ -380,7 +393,7 @@ const App: React.FC = () => {
 };
 
 const AuthenticatedApp: React.FC = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user, token, clearPasswordChangeRequirement } = useAuth();
   const [authView, setAuthView] = useState<'login' | 'register' | 'forgot'>('login');
 
   // Show loading state while auth is initializing from localStorage
@@ -398,6 +411,18 @@ const AuthenticatedApp: React.FC = () => {
           <p className="text-text-muted text-sm">Loading...</p>
         </motion.div>
       </div>
+    );
+  }
+
+  // Show password change screen if user needs to change password
+  if (isAuthenticated && user?.requirePasswordChange && token) {
+    return (
+      <ChangePassword
+        token={token}
+        onPasswordChanged={() => {
+          clearPasswordChangeRequirement();
+        }}
+      />
     );
   }
 

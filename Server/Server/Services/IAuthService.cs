@@ -7,6 +7,7 @@ namespace Server.Services
         Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto);
         Task<AuthResponseDto> LoginAsync(LoginDto loginDto);
         Task<ForgotPasswordResponseDto> ForgotPasswordAsync(ForgotPasswordDto forgotPasswordDto);
+        Task<ChangePasswordResponseDto> ChangePasswordAsync(string userEmail, ChangePasswordDto changePasswordDto);
         string GenerateJwtToken(string email, string username, int userId, bool isAdmin = false);
     }
 }

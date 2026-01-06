@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Server, Settings, User, Moon, Sun, Activity, ChevronRight, Map, LogOut } from 'lucide-react';
+import { LayoutDashboard, Server, Settings, User, Moon, Sun, Activity, ChevronRight, Map, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 
@@ -24,6 +24,11 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, collapsed: c
     { id: 'dashboard', icon: <LayoutDashboard size={18} />, label: 'Overview', badge: null },
     { id: 'map', icon: <Map size={18} />, label: 'Global Map', badge: null },
   ];
+
+  // Add admin-only menu item
+  if (user?.isAdmin) {
+    menuItems.push({ id: 'users', icon: <Users size={18} />, label: 'User Management', badge: null });
+  }
 
   return (
     <motion.aside

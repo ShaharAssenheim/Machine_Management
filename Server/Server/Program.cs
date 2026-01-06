@@ -76,6 +76,8 @@ void RegisterServices(IServiceCollection services)
     services.AddScoped<IMachineService, MachineService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IEmailService, EmailService>();
+    services.AddScoped<IUserManagementService, UserManagementService>();
+    services.AddScoped<IEmailValidationService, EmailValidationService>();
 }
 
 void ConfigureAuthentication(IServiceCollection services, IConfiguration configuration)
@@ -116,6 +118,7 @@ void ConfigureCors(IServiceCollection services)
             policy.WithOrigins(
                 "http://localhost:5173",
                 "http://localhost:3000",
+                "http://localhost:3001",
                 "http://localhost:5174"
             )
             .AllowAnyMethod()
